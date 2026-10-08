@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: book-lending-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/lending
+    username: lending
+    password: lending
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  shutdown: graceful
+
+# Borrowing rules: configuration only, never stored in the database.
+# Override with env vars, e.g. LIBRARY_LOAN_MAX_ACTIVE_LOANS=5, LIBRARY_LOAN_DURATION=21d
+library:
+  loan:
+    max-active-loans: 3
+    duration: 14d
+
+# Predefined users (BCrypt hashes). MEMBER usernames must match member.email.
+# Demo passwords are listed in the README.
+app:
+  security:
+    users:
+      - username: admin
+        password: "{bcrypt}$2a$10$JY0yZ0jpppNhMX.AVLd.J.GAJuIH0RLxWRufp/mbRfaP0YYH42ySy"
+        roles: [ADMIN]
+      - username: librarian
+        password: "{bcrypt}$2a$10$0tGcmIz7RIKiUZQzGXmQQ.xcyj6uZagNUIwHcnhDJYszGO4sMfxEa"
+        roles: [LIBRARIAN]
+      - username: alice@example.com
+        password: "{bcrypt}$2a$10$vHyDvu8I2VNJyGTt20rCv.CZUTN5jX8kLTUPrVIHEdpdTgul05UPq"
+        roles: [MEMBER]
+      - username: bob@example.com
+        password: "{bcrypt}$2a$10$2djQaDgyGrU7dM9dhvl0ves1.1mrFXw5zZu1ZupT3iJHGE9aTqHWW"
+        roles: [MEMBER]
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+      roles: ADMIN
+      group:
+        readiness:
+          include: readinessState, db
+  info:
+    java:
+      enabled: true
+    os:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+logging:
+  structured:
+    format:
+      console: ecs
+  pattern:
+    correlation: "[%X{traceId:-}] "
+
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha
+    operations-sorter: method
+    persist-authorization: true

@@ -1,0 +1,7 @@
+# Developer profile (active for ./mvnw spring-boot:run): human-readable logs.
+logging:
+  structured:
+    format:
+      console: ""
+  level:
+    com.lexhive.lending: DEBUG

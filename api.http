@@ -1,0 +1,168 @@
+### Book Lending Service — sample requests
+### Works with the IntelliJ HTTP Client and the VS Code "REST Client" extension.
+### Start the stack first: docker compose up --build
+### IDs below match the seed data (V2__seed_data.sql) on a fresh database.
+
+@host = http://localhost:8080
+@admin = admin admin123
+@librarian = librarian librarian123
+@alice = alice@example.com alice123
+@bob = bob@example.com bob123
+
+### Health (public)
+GET {{host}}/actuator/health
+
+### ---------------------------------------------------------------- Books
+
+### List books, search by title (any authenticated user)
+GET {{host}}/api/v1/books?title=design&page=0&size=5&sort=title,asc
+Authorization: Basic {{alice}}
+
+### Get one book
+GET {{host}}/api/v1/books/1
+Authorization: Basic {{alice}}
+
+### Add a book (LIBRARIAN / ADMIN)
+POST {{host}}/api/v1/books
+Authorization: Basic {{librarian}}
+Content-Type: application/json
+
+{
+  "title": "Clean Architecture",
+  "author": "Robert C. Martin",
+  "isbn": "978-0134494166",
+  "totalCopies": 2
+}
+
+### Update a book (cannot drop totalCopies below copies on loan -> 409 COPIES_ON_LOAN)
+PUT {{host}}/api/v1/books/1
+Authorization: Basic {{librarian}}
+Content-Type: application/json
+
+{
+  "title": "Clean Code",
+  "author": "Robert C. Martin",
+  "isbn": "9780132350884",
+  "totalCopies": 4
+}
+
+### Validation error -> 400 with field errors
+POST {{host}}/api/v1/books
+Authorization: Basic {{librarian}}
+Content-Type: application/json
+
+{
+  "title": "",
+  "author": "Nobody",
+  "isbn": "123",
+  "totalCopies": -1
+}
+
+### Member tries to add a book -> 403
+POST {{host}}/api/v1/books
+Authorization: Basic {{alice}}
+Content-Type: application/json
+
+{
+  "title": "Not allowed",
+  "author": "Alice",
+  "isbn": "9780134494166",
+  "totalCopies": 1
+}
+
+### ---------------------------------------------------------------- Members
+
+### List members (LIBRARIAN / ADMIN)
+GET {{host}}/api/v1/members
+Authorization: Basic {{librarian}}
+
+### Alice reads her own profile (member 1)
+GET {{host}}/api/v1/members/1
+Authorization: Basic {{alice}}
+
+### Alice reads Bob's profile -> 403
+GET {{host}}/api/v1/members/2
+Authorization: Basic {{alice}}
+
+### Register a member
+POST {{host}}/api/v1/members
+Authorization: Basic {{librarian}}
+Content-Type: application/json
+
+{
+  "name": "Dave Miller",
+  "email": "dave@example.com"
+}
+
+### ---------------------------------------------------------------- Loans
+
+### Alice borrows "The Pragmatic Programmer" (book 4, one copy) for herself
+POST {{host}}/api/v1/loans
+Authorization: Basic {{alice}}
+Content-Type: application/json
+X-Request-Id: demo-borrow-1
+
+{
+  "bookId": 4,
+  "memberId": 1
+}
+
+### Bob tries the same book -> 409 BOOK_UNAVAILABLE
+POST {{host}}/api/v1/loans
+Authorization: Basic {{bob}}
+Content-Type: application/json
+
+{
+  "bookId": 4,
+  "memberId": 2
+}
+
+### Alice tries to borrow for Bob -> 403
+POST {{host}}/api/v1/loans
+Authorization: Basic {{alice}}
+Content-Type: application/json
+
+{
+  "bookId": 1,
+  "memberId": 2
+}
+
+### Librarian borrows on behalf of Bob
+POST {{host}}/api/v1/loans
+Authorization: Basic {{librarian}}
+Content-Type: application/json
+
+{
+  "bookId": 1,
+  "memberId": 2
+}
+
+### Alice's loans (newest first)
+GET {{host}}/api/v1/members/1/loans
+Authorization: Basic {{alice}}
+
+### Return loan 1 (Alice owns it)
+POST {{host}}/api/v1/loans/1/return
+Authorization: Basic {{alice}}
+
+### Return it again -> 409 LOAN_ALREADY_RETURNED
+POST {{host}}/api/v1/loans/1/return
+Authorization: Basic {{alice}}
+
+### Search loans by status: ACTIVE | OVERDUE | RETURNED (LIBRARIAN / ADMIN)
+GET {{host}}/api/v1/loans?status=ACTIVE&sort=dueDate,asc
+Authorization: Basic {{librarian}}
+
+### ---------------------------------------------------------------- Observability (ADMIN)
+
+### Business metrics: library_loans_*
+GET {{host}}/actuator/prometheus
+Authorization: Basic {{admin}}
+
+### Build and git info
+GET {{host}}/actuator/info
+Authorization: Basic {{admin}}
+
+### Health details (DB) are shown to ADMIN
+GET {{host}}/actuator/health
+Authorization: Basic {{admin}}
